@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBRT Constraint Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #3498db;
+            text-align: center;
+        }
+        form {
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            width: 100%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #bdc3c7;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #465c74;
+            color: #ecf0f1;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #result {
+            margin-top: 20px;
+            background-color: #34495e;
+            padding: 20px;
+            border-radius: 8px;
+            width: 100%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .constraint {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #465c74;
+            border-radius: 4px;
+        }
+        .constraint-title {
+            font-weight: bold;
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <h1>SBRT Constraint Calculator</h1>
+    <form id="calculatorForm">
+        <label for="doseLevel">Dose Level (cGy):</label>
+        <input type="number" id="doseLevel" required>
+
+        <label for="ptvVolume">PTV Volume (cc):</label>
+        <input type="number" id="ptvVolume" required step="0.1">
+
+        <button type="button" id="calculateButton">Calculate</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        const lookupTable = [
+            { ptvVolume: 1.8, bodyV50_1: 5.9, bodyV50_2: 7.5, d2cm1: 50, d2cm2: 57 },
+            { ptvVolume: 3.8, bodyV50_1: 5.5, bodyV50_2: 6.5, d2cm1: 50, d2cm2: 57 },
+            { ptvVolume: 7.4, bodyV50_1: 5.1, bodyV50_2: 6.0, d2cm1: 50, d2cm2: 58 },
+            { ptvVolume: 13.2, bodyV50_1: 4.7, bodyV50_2: 5.8, d2cm1: 50, d2cm2: 58 },
+            { ptvVolume: 22.0, bodyV50_1: 4.5, bodyV50_2: 5.5, d2cm1: 54, d2cm2: 63 },
+            { ptvVolume: 34.0, bodyV50_1: 4.3, bodyV50_2: 5.3, d2cm1: 58, d2cm2: 68 },
+            { ptvVolume: 50.0, bodyV50_1: 4.0, bodyV50_2: 5.0, d2cm1: 62, d2cm2: 77 },
+            { ptvVolume: 70.0, bodyV50_1: 3.5, bodyV50_2: 4.8, d2cm1: 66, d2cm2: 86 },
+            { ptvVolume: 95.0, bodyV50_1: 3.3, bodyV50_2: 4.4, d2cm1: 70, d2cm2: 89 },
+            { ptvVolume: 126.0, bodyV50_1: 3.1, bodyV50_2: 4.0, d2cm1: 73, d2cm2: 91 },
+            { ptvVolume: 163.0, bodyV50_1: 2.9, bodyV50_2: 3.7, d2cm1: 77, d2cm2: 94 }
+        ];
+
+        function interpolate(ptvVolume, property) {
+            if (ptvVolume <= lookupTable[0].ptvVolume) {
+                return lookupTable[0][property];
+            }
+
+            if (ptvVolume >= lookupTable[lookupTable.length - 1].ptvVolume) {
+                return lookupTable[lookupTable.length - 1][property];
+            }
+
+            for (let i = 0; i < lookupTable.length - 1; i++) {
+                if (ptvVolume >= lookupTable[i].ptvVolume && ptvVolume <= lookupTable[i + 1].ptvVolume) {
+                    const x1 = lookupTable[i].ptvVolume;
+                    const x2 = lookupTable[i + 1].ptvVolume;
+                    const y1 = lookupTable[i][property];
+                    const y2 = lookupTable[i + 1][property];
+
+                    return y1 + (y2 - y1) * (ptvVolume - x1) / (x2 - x1);
+                }
+            }
+        }
+
+        document.getElementById('calculateButton').addEventListener('click', function() {
+            const doseLevel = parseFloat(document.getElementById('doseLevel').value);
+            const ptvVolume = parseFloat(document.getElementById('ptvVolume').value);
+
+            if (isNaN(doseLevel) || isNaN(ptvVolume)) {
+                alert("Please enter valid numbers for both fields.");
+                return;
+            }
+
+            const d2cmConstraint1 = doseLevel * (interpolate(ptvVolume, 'd2cm1') / 100);
+            const d2cmConstraint2 = doseLevel * (interpolate(ptvVolume, 'd2cm2') / 100);
+            const bodyV50Constraint1 = ptvVolume * interpolate(ptvVolume, 'bodyV50_1');
+            const bodyV50Constraint2 = ptvVolume * interpolate(ptvVolume, 'bodyV50_2');
+            const bodyV100Constraint1 = ptvVolume * 1.2;
+            const bodyV100Constraint2 = ptvVolume * 1.5;
+
+            const resultElement = document.getElementById('result');
+            resultElement.innerHTML = `
+                <div class="constraint">
+                    <span class="constraint-title">Body V100%:</span><br>
+                    1st: <= ${bodyV100Constraint1.toFixed(2)} cc<br>
+                    2nd: <= ${bodyV100Constraint2.toFixed(2)} cc
+                </div>
+                <div class="constraint">
+                    <span class="constraint-title">Body V50%:</span><br>
+                    1st: <= ${bodyV50Constraint1.toFixed(2)} cc<br>
+                    2nd: <= ${bodyV50Constraint2.toFixed(2)} cc
+                </div>
+                <div class="constraint">
+                    <span class="constraint-title">D2cm:</span><br>
+                    1st: <= ${d2cmConstraint1.toFixed(0)} cGy<br>
+                    2nd: <= ${d2cmConstraint2.toFixed(0)} cGy
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>
